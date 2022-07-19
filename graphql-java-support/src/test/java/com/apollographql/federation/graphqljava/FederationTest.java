@@ -1,6 +1,5 @@
 package com.apollographql.federation.graphqljava;
 
-import static com.apollographql.federation.graphqljava.SchemaUtils.standardDirectives;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,49 +11,37 @@ import graphql.com.google.common.collect.ImmutableMap;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLNamedType;
 import graphql.schema.GraphQLObjectType;
-import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLUnionType;
 import graphql.schema.idl.RuntimeWiring;
-import graphql.schema.idl.SchemaGenerator;
-import graphql.schema.idl.SchemaParser;
-import graphql.schema.idl.TypeDefinitionRegistry;
 import graphql.schema.idl.TypeRuntimeWiring;
 import graphql.schema.idl.errors.SchemaProblem;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class FederationTest {
-  private final String emptySDL = TestUtils.readResource("schemas/empty.graphql");
-  private final String emptyFederatedSDL = TestUtils.readResource("schemas/emptyFederated.graphql");
+  private final String emptySDL = FileUtils.readResource("schemas/empty.graphql");
+  private final String emptyFederatedSDL = FileUtils.readResource("schemas/emptyFederated.graphql");
   private final String emptySchemaFederatedSDL =
-      TestUtils.readResource("schemas/emptySchemaFederated.graphql");
+      FileUtils.readResource("schemas/emptySchemaFederated.graphql");
   private final String emptyWithExtendQuerySDL =
-      TestUtils.readResource("schemas/emptyWithExtendQuery.graphql");
+      FileUtils.readResource("schemas/emptyWithExtendQuery.graphql");
   private final String emptyWithExtendQueryFederatedSDL =
-      TestUtils.readResource("schemas/emptyWithExtendQueryFederated.graphql");
+      FileUtils.readResource("schemas/emptyWithExtendQueryFederated.graphql");
   private final String emptyWithExtendQueryServiceSDL =
-      TestUtils.readResource("schemas/emptyWithExtendQueryService.graphql");
-  private final String interfacesSDL = TestUtils.readResource("schemas/interfaces.graphql");
-  private final String isolatedSDL = TestUtils.readResource("schemas/isolated.graphql");
-  private final String productSDL = TestUtils.readResource("schemas/product.graphql");
-  private final String printerEscapingSDL =
-      TestUtils.readResource("schemas/printerEscaping.graphql");
-  private final String printerEscapingExpectedSDL =
-      TestUtils.readResource("schemas/printerEscapingExpected.graphql");
-  private final String printerFilterSDL = TestUtils.readResource("schemas/printerFilter.graphql");
-  private final String printerFilterExpectedSDL =
-      TestUtils.readResource("schemas/printerFilterExpected.graphql");
-  private final String fed2SDL = TestUtils.readResource("schemas/fed2.graphql");
-  private final String fed2FederatedSDL = TestUtils.readResource("schemas/fed2Federated.graphql");
-  private final String fed2ServiceSDL = TestUtils.readResource("schemas/fed2Service.graphql");
-  private final String unionsSDL = TestUtils.readResource("schemas/unions.graphql");
+      FileUtils.readResource("schemas/emptyWithExtendQueryService.graphql");
+  private final String interfacesSDL = FileUtils.readResource("schemas/interfaces.graphql");
+  private final String isolatedSDL = FileUtils.readResource("schemas/isolated.graphql");
+  private final String productSDL = FileUtils.readResource("schemas/product.graphql");
+  private final String fed2SDL = FileUtils.readResource("schemas/fed2.graphql");
+  private final String fed2FederatedSDL = FileUtils.readResource("schemas/fed2Federated.graphql");
+  private final String fed2ServiceSDL = FileUtils.readResource("schemas/fed2Service.graphql");
+  private final String unionsSDL = FileUtils.readResource("schemas/unions.graphql");
   private final String unionsFederatedSDL =
-      TestUtils.readResource("schemas/unionsFederated.graphql");
+      FileUtils.readResource("schemas/unionsFederated.graphql");
 
   @Test
   void testEmptySDL() {
@@ -173,56 +160,6 @@ class FederationTest {
             .collect(Collectors.toList());
 
     assertIterableEquals(Arrays.asList("Book", "Movie", "Page"), unionTypes);
-  }
-
-  @Test
-  void testPrinterEscaping() {
-    TypeDefinitionRegistry typeDefinitionRegistry = new SchemaParser().parse(printerEscapingSDL);
-    GraphQLSchema graphQLSchema =
-        new SchemaGenerator()
-            .makeExecutableSchema(typeDefinitionRegistry, RuntimeWiring.newRuntimeWiring().build());
-    Assertions.assertEquals(
-        printerEscapingExpectedSDL.trim(),
-        new FederationSdlPrinter(
-                FederationSdlPrinter.Options.defaultOptions()
-                    .includeDirectiveDefinitions(
-                        def -> !standardDirectives.contains(def.getName())))
-            .print(graphQLSchema)
-            .trim());
-  }
-
-  @Test
-  void testPrinterFilter() {
-    TypeDefinitionRegistry typeDefinitionRegistry = new SchemaParser().parse(printerFilterSDL);
-    RuntimeWiring runtimeWiring =
-        RuntimeWiring.newRuntimeWiring()
-            .type("Interface1", typeWiring -> typeWiring.typeResolver(env -> null))
-            .type("Interface2", typeWiring -> typeWiring.typeResolver(env -> null))
-            .scalar(
-                GraphQLScalarType.newScalar()
-                    .name("Scalar1")
-                    .coercing(Scalars.GraphQLString.getCoercing())
-                    .build())
-            .scalar(
-                GraphQLScalarType.newScalar()
-                    .name("Scalar2")
-                    .coercing(Scalars.GraphQLString.getCoercing())
-                    .build())
-            .build();
-    GraphQLSchema graphQLSchema =
-        new SchemaGenerator().makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
-    Assertions.assertEquals(
-        printerFilterExpectedSDL.trim(),
-        new FederationSdlPrinter(
-                FederationSdlPrinter.Options.defaultOptions()
-                    .includeScalarTypes(true)
-                    .includeDirectiveDefinitions(
-                        def ->
-                            !def.getName().endsWith("1")
-                                && !standardDirectives.contains(def.getName()))
-                    .includeTypeDefinitions(def -> !def.getName().endsWith("1")))
-            .print(graphQLSchema)
-            .trim());
   }
 
   @Test

@@ -6,12 +6,15 @@ import graphql.schema.DataFetcher;
 import graphql.schema.DataFetcherFactory;
 import graphql.schema.FieldCoordinates;
 import graphql.schema.GraphQLCodeRegistry;
+import graphql.schema.GraphQLDirective;
 import graphql.schema.GraphQLDirectiveContainer;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLFieldsContainer;
+import graphql.schema.GraphQLNamedSchemaElement;
 import graphql.schema.GraphQLNamedType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
+import graphql.schema.GraphQLSchemaElement;
 import graphql.schema.GraphQLType;
 import graphql.schema.TypeResolver;
 import graphql.schema.idl.errors.SchemaProblem;
@@ -132,7 +135,7 @@ public final class SchemaTransformer {
         (DataFetcher<Object>) environment -> serviceObject);
     final String sdl;
     if (isFederation2) {
-      // For federation2, we're trying something new and outputing
+      // federation v2 SDL does not need to filter federation directive definitions
       final Set<String> standardDirectives =
           new HashSet<>(Arrays.asList("deprecated", "include", "skip", "specifiedBy"));
 
@@ -141,8 +144,7 @@ public final class SchemaTransformer {
                   FederationSdlPrinter.Options.defaultOptions()
                       .includeSchemaDefinition(true)
                       .includeScalarTypes(true)
-                      .includeDirectiveDefinitions(
-                          def -> !standardDirectives.contains(def.getName())))
+                      .includeDirectives(def -> !standardDirectives.contains(def)))
               .print(newSchema.codeRegistry(newCodeRegistry.build()).build())
               .trim();
     } else {
@@ -261,21 +263,23 @@ public final class SchemaTransformer {
       schema = schema.transform(schemaBuilder -> schemaBuilder.codeRegistry(newCodeRegistry));
     }
 
-    // Note that FederationSdlPrinter is a copy of graphql-java's SchemaPrinter that adds the
-    // ability to filter out directive and type definitions, which is required by federation
-    // spec.
-    //
-    // FederationSdlPrinter will need to be updated whenever graphql-java changes versions. It
-    // can be removed when graphql-java adds native support for filtering out directive and
-    // type definitions or federation spec changes to allow the currently forbidden directive
-    // and type definitions.
+    final Predicate<GraphQLSchemaElement> excludeFedTypeDefinitions =
+        element ->
+            !(element instanceof GraphQLNamedSchemaElement
+                && hiddenTypeDefinitions.contains(((GraphQLNamedSchemaElement) element).getName()));
+    final Predicate<GraphQLSchemaElement> excludeFedDirectiveDefinitions =
+        element ->
+            !(element instanceof GraphQLDirective
+                && hiddenDirectiveDefinitions.contains(((GraphQLDirective) element).getName()));
     final FederationSdlPrinter.Options options =
         FederationSdlPrinter.Options.defaultOptions()
             .includeScalarTypes(true)
             .includeSchemaDefinition(true)
-            .includeDirectives(true)
-            .includeDirectiveDefinitions(def -> !hiddenDirectiveDefinitions.contains(def.getName()))
-            .includeTypeDefinitions(def -> !hiddenTypeDefinitions.contains(def.getName()));
-    return new FederationSdlPrinter(options).print(schema);
+            .includeDirectives(FederationDirectives.allNames::contains)
+            .includeSchemaElement(
+                element ->
+                    excludeFedTypeDefinitions.test(element)
+                        && excludeFedDirectiveDefinitions.test(element));
+    return new FederationSdlPrinter(options).print(schema).trim();
   }
 }

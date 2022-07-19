@@ -36,8 +36,7 @@ final class SchemaUtils {
           new FederationSdlPrinter(
                   FederationSdlPrinter.Options.defaultOptions()
                       .includeScalarTypes(true)
-                      .includeDirectiveDefinitions(
-                          def -> !standardDirectives.contains(def.getName())))
+                      .includeDirectives(directive -> !standardDirectives.contains(directive)))
               .print(schema)
               .trim());
     }
