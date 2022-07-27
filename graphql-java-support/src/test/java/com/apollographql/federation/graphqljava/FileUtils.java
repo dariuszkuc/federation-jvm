@@ -12,8 +12,10 @@ public final class FileUtils {
   private static final String NEW_LINE_SEPARATOR = "\n";
 
   public static String readResource(String name) {
-    try (InputStream is = SchemaUtils.class.getResourceAsStream(name)) {
-      assert is != null;
+    try (InputStream is = FederatedSchemaVerifier.class.getClassLoader().getResourceAsStream(name)) {
+      if (is == null) {
+        throw new RuntimeException("Unable to locate the target file " + name);
+      }
       try (BufferedReader reader =
           new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
         String contents = reader.lines().collect(Collectors.joining(NEW_LINE_SEPARATOR)).trim();

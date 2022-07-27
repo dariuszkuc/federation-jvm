@@ -1,8 +1,6 @@
-schema @link(import : ["@key", "@shareable", {name : "@tag", as : "@apollo_tag"}, "@override"], url : "https://specs.apollo.dev/federation/v2.0"){
+schema @link(import : ["@key"], url : "https://specs.apollo.dev/federation/v2.0"){
   query: Query
 }
-
-directive @apollo_tag(name: String!) repeatable on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
 
 directive @federation__extends on OBJECT | INTERFACE
 
@@ -10,29 +8,43 @@ directive @federation__external on OBJECT | FIELD_DEFINITION
 
 directive @federation__inaccessible on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
 
+directive @federation__override(from: String!) on FIELD_DEFINITION
+
 directive @federation__provides(fields: federation__FieldSet!) on FIELD_DEFINITION
 
 directive @federation__requires(fields: federation__FieldSet!) on FIELD_DEFINITION
+
+directive @federation__shareable on OBJECT | FIELD_DEFINITION
+
+directive @federation__tag(name: String!) repeatable on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
 
 directive @key(fields: federation__FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
 
 directive @link(as: String, import: [federation__Import], url: String!) repeatable on SCHEMA
 
-directive @override(from: String!) on FIELD_DEFINITION
+interface Product @key(fields : "id", resolvable : true) {
+  id: ID!
+  name: String!
+}
 
-directive @shareable on OBJECT | FIELD_DEFINITION
+union _Entity = Book | Movie
 
-union _Entity = Position
+type Book implements Product {
+  author: String!
+  id: ID!
+  name: String!
+}
 
-type Position @key(fields : "id", resolvable : false) @shareable {
-  id: ID! @apollo_tag(name : "internal")
-  x: Int! @override(from : "otherGraph")
-  y: Int!
+type Movie implements Product {
+  director: String!
+  id: ID!
+  name: String!
 }
 
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
-  _service: _Service
+  _service: _Service!
+  movie(id: ID!): Movie
 }
 
 type _Service {

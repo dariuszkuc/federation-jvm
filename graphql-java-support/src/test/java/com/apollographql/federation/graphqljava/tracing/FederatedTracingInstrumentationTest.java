@@ -27,7 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class FederatedTracingInstrumentationTest {
-  private final String tracingSDL = FileUtils.readResource("schemas/tracing.graphql");
+  private final String tracingSDL = FileUtils.readResource("schemas/tracingSchema.graphql");
   private GraphQL graphql;
 
   @BeforeEach

@@ -1,28 +1,22 @@
 package com.apollographql.federation.graphqljava;
 
+import static com.apollographql.federation.graphqljava.printer.ServiceSDLPrinter.generateServiceSDL;
+import static com.apollographql.federation.graphqljava.printer.ServiceSDLPrinter.generateServiceSDLV2;
+
 import graphql.GraphQLError;
 import graphql.schema.Coercing;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetcherFactory;
 import graphql.schema.FieldCoordinates;
 import graphql.schema.GraphQLCodeRegistry;
-import graphql.schema.GraphQLDirective;
 import graphql.schema.GraphQLDirectiveContainer;
-import graphql.schema.GraphQLFieldDefinition;
-import graphql.schema.GraphQLFieldsContainer;
-import graphql.schema.GraphQLNamedSchemaElement;
 import graphql.schema.GraphQLNamedType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
-import graphql.schema.GraphQLSchemaElement;
 import graphql.schema.GraphQLType;
 import graphql.schema.TypeResolver;
 import graphql.schema.idl.errors.SchemaProblem;
-import graphql.schema.visibility.GraphqlFieldVisibility;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -31,9 +25,6 @@ import org.jetbrains.annotations.NotNull;
 
 public final class SchemaTransformer {
   private static final Object serviceObject = new Object();
-  // Apollo Gateway will fail composition if it sees standard directive definitions.
-  private static final Set<String> STANDARD_DIRECTIVES =
-      new HashSet<>(Arrays.asList("deprecated", "include", "skip", "specifiedBy"));
   private final GraphQLSchema originalSchema;
   private final boolean queryTypeShouldBeEmpty;
   private TypeResolver entityTypeResolver = null;
@@ -135,18 +126,7 @@ public final class SchemaTransformer {
         (DataFetcher<Object>) environment -> serviceObject);
     final String sdl;
     if (isFederation2) {
-      // federation v2 SDL does not need to filter federation directive definitions
-      final Set<String> standardDirectives =
-          new HashSet<>(Arrays.asList("deprecated", "include", "skip", "specifiedBy"));
-
-      sdl =
-          new FederationSdlPrinter(
-                  FederationSdlPrinter.Options.defaultOptions()
-                      .includeSchemaDefinition(true)
-                      .includeScalarTypes(true)
-                      .includeDirectives(def -> !standardDirectives.contains(def)))
-              .print(newSchema.codeRegistry(newCodeRegistry.build()).build())
-              .trim();
+      sdl = generateServiceSDLV2(newSchema.codeRegistry(newCodeRegistry.build()).build());
     } else {
       // For Federation1, we filter out the federation definitions
       sdl = sdl(originalSchema, queryTypeShouldBeEmpty);
@@ -215,71 +195,28 @@ public final class SchemaTransformer {
     };
   }
 
+  /**
+   * Generate Apollo Federation v1 compatible SDL that should be returned from `_service { sdl }` query.
+   *
+   * @param schema target schema
+   * @deprecated use ServiceSDLPrinter instead
+   * @return SDL compatible with Apollo Federation v1
+   */
+  @Deprecated()
   public static String sdl(GraphQLSchema schema) {
     return sdl(schema, false);
   }
 
+  /**
+   * Generate Apollo Federation v1 compatible SDL that should be returned from `_service { sdl }` query.
+   *
+   * @param schema target schema
+   * @param queryTypeShouldBeEmpty boolean flag indicating whether schema contains dummy query that should be removed
+   * @deprecated use ServiceSDLPrinter instead
+   * @return SDL compatible with Apollo Federation v1
+   */
+  @Deprecated
   public static String sdl(GraphQLSchema schema, boolean queryTypeShouldBeEmpty) {
-    // Gather directive definitions to hide.
-    final Set<String> hiddenDirectiveDefinitions = new HashSet<>();
-    hiddenDirectiveDefinitions.addAll(STANDARD_DIRECTIVES);
-    hiddenDirectiveDefinitions.addAll(FederationDirectives.allNames);
-
-    // Gather type definitions to hide.
-    final Set<String> hiddenTypeDefinitions = new HashSet<>();
-    hiddenTypeDefinitions.add(_Any.typeName);
-    hiddenTypeDefinitions.add(_Entity.typeName);
-    hiddenTypeDefinitions.add(_FieldSet.typeName);
-    hiddenTypeDefinitions.add(_Service.typeName);
-
-    // Change field visibility for the query type if needed.
-    if (queryTypeShouldBeEmpty) {
-      final String queryTypeName = schema.getQueryType().getName();
-      final GraphqlFieldVisibility oldFieldVisibility =
-          schema.getCodeRegistry().getFieldVisibility();
-      final GraphqlFieldVisibility newFieldVisibility =
-          new GraphqlFieldVisibility() {
-            @Override
-            public List<GraphQLFieldDefinition> getFieldDefinitions(
-                GraphQLFieldsContainer fieldsContainer) {
-              return fieldsContainer.getName().equals(queryTypeName)
-                  ? Collections.emptyList()
-                  : oldFieldVisibility.getFieldDefinitions(fieldsContainer);
-            }
-
-            @Override
-            public GraphQLFieldDefinition getFieldDefinition(
-                GraphQLFieldsContainer fieldsContainer, String fieldName) {
-              return fieldsContainer.getName().equals(queryTypeName)
-                  ? null
-                  : oldFieldVisibility.getFieldDefinition(fieldsContainer, fieldName);
-            }
-          };
-      final GraphQLCodeRegistry newCodeRegistry =
-          schema
-              .getCodeRegistry()
-              .transform(
-                  codeRegistryBuilder -> codeRegistryBuilder.fieldVisibility(newFieldVisibility));
-      schema = schema.transform(schemaBuilder -> schemaBuilder.codeRegistry(newCodeRegistry));
-    }
-
-    final Predicate<GraphQLSchemaElement> excludeFedTypeDefinitions =
-        element ->
-            !(element instanceof GraphQLNamedSchemaElement
-                && hiddenTypeDefinitions.contains(((GraphQLNamedSchemaElement) element).getName()));
-    final Predicate<GraphQLSchemaElement> excludeFedDirectiveDefinitions =
-        element ->
-            !(element instanceof GraphQLDirective
-                && hiddenDirectiveDefinitions.contains(((GraphQLDirective) element).getName()));
-    final FederationSdlPrinter.Options options =
-        FederationSdlPrinter.Options.defaultOptions()
-            .includeScalarTypes(true)
-            .includeSchemaDefinition(true)
-            .includeDirectives(FederationDirectives.allNames::contains)
-            .includeSchemaElement(
-                element ->
-                    excludeFedTypeDefinitions.test(element)
-                        && excludeFedDirectiveDefinitions.test(element));
-    return new FederationSdlPrinter(options).print(schema).trim();
+    return generateServiceSDL(schema, queryTypeShouldBeEmpty);
   }
 }
